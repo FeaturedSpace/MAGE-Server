@@ -191,5 +191,5 @@ io.sockets.on('connection', function(socket) {
 // }, 1000 / 30);
 
 
-console.log('MAGE Server Activated...');
-server.listen(process.env.PORT);
+console.log('MAGE Server Activated... PORT: ' + process.env.PORT);
+server.listen(3000);
