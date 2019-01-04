@@ -2,6 +2,20 @@ var server = require('http').createServer();
 var io = require('socket.io')(server);
 
 var players = {};
+var messages = {};
+
+var SpawnPoints = {
+  spawnPoints: [
+    { x: -12.706, y: 0.5, z: 0 },
+    { x: -2.28, y: 0.5, z: -23.73 },
+    { x: 12.197, y: 4, z: 0.679 },
+    { x: 3.378, y: 0.5, z: 15.888 }
+  ],
+  
+  getRandomSpawn: function() {
+    return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)];
+  }
+}
 
 function Player(id) {
     this.id = id;
@@ -16,8 +30,25 @@ function Player(id) {
     this.rotW = 0;
 
     this.currentAnimation = 'Idle';
-
+  
+    this.displayItem = 0;
+    this.shooting = false;
+  
+    this.name = "Guest";
+  
+    this.setPosition = function(pos) {
+      this.x = pos.x;
+      this.y = pos.y;
+      this.z = pos.z;
+    };
+    
     this.entity = null;
+}
+
+function Message(data) {
+    this.sender = data.sender;
+    this.text = data.text;
+    this.time = data.time;
 }
 
 io.sockets.on('connection', function(socket) {
@@ -26,6 +57,10 @@ io.sockets.on('connection', function(socket) {
         var id = socket.id;
         var newPlayer = new Player(id);
         players[id] = newPlayer;
+      
+        newPlayer.setPosition(SpawnPoints.getRandomSpawn());
+        socket.emit('spawn', newPlayer);
+        console.log('New player: ' + id);
         
         socket.emit('playerData', {
             id: id,
@@ -33,16 +68,21 @@ io.sockets.on('connection', function(socket) {
         });
       
         socket.broadcast.emit('playerJoined', newPlayer);
+        console.log('ID: ' + id + ' | ' + 'Initialized!');
     });
 
     socket.on('positionUpdate', function(data) {
-        if (!players[data.id]) return;
+        if (!players[data.id]) {
+          console.log('Player: ' + players[data.id] + 'does not exist');
+          return;
+        }
+        
         players[data.id].x = data.x;
         players[data.id].y = data.y;
         players[data.id].z = data.z;
       
         console.log('[POS] ID: ' + data.id + ' | ' + 'X: ' + players[data.id].x + ' Y: ' + players[data.id].y + ' Z: ' + players[data.id].z);
-
+        
         // Individual Packet Simulation
         socket.broadcast.emit ('playerMoved', data);
     });
@@ -68,10 +108,77 @@ io.sockets.on('connection', function(socket) {
         // Individual Packet Simulation
         socket.broadcast.emit('playerAnimation', data);
     });
+  
+    socket.on('inventoryUpdate', function(data) {
+        if(!players[data.id]) return;
+        
+        players[data.id].displayItem = data.slot;
+      
+        // Individual Packet Simulation
+        socket.broadcast.emit('playerInventory', data);
+        console.log("[ITEM] " + "ID: " + data.id + "; Item: " + data.item);
+    });
+  
+    socket.on('shootingUpdate', function(data) {
+        if(!players[data.id]) return;
+      
+        players[data.id].shooting = data.shooting;
+      
+        // Individual Packet Simulation
+        socket.broadcast.emit('playerShooting', data);
+    });
+  
+    socket.on('damageUpdate', function(data) {
+        if(!players[data.id]) return;
+      
+        players[data.otherId].health -= data.damage;
+      
+        // Individual Packet Simulation
+        socket.broadcast.emit('playerDamage', data);
+    });
+  
+    socket.on('deathUpdate', function(data) {
+        if(!players[data.id]) return;
+      
+        players[data.id].dead = data.dead;
+      
+        // Individual Packet Simulation
+        socket.broadcast.emit('playerDeath', data);
+    });
+  
+    socket.on('bulletUpdate', function(data) {
+        if(!players[data.id]) return;
+      
+        
+        // Individual Packet Simulation
+        socket.broadcast.emit('playerBullet', data);
+    });
+  
+    socket.on('nameUpdate', function(data) {
+        if(!players[data.id]) return;
+      
+        players[data.id].name = data.name;
+        console.log("[NAME] ID: " + data.id + "; Name:" + data.name);
+      
+        // Individual Packet Simulation
+        
+        socket.broadcast.emit('playerName', data);
+    });
+  
+    socket.on('chatMessage', function(data) {
+        if(!players[data.id]) return;
+      
+        data.sender = players[data.id].name;
+        messages.push(new Message(data));
+      
+        // Individual Packet Simulation
+        socket.broadcast.emit('message', data);
+    });
 
     socket.on('disconnect', function() {
         if (!players[socket.id]) return;
         delete players[socket.id];
+        
         // Update clients with the new player killed 
         socket.broadcast.emit('killPlayer', socket.id);
     });
