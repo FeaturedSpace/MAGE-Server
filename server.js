@@ -6,6 +6,7 @@ var Command = require('./command/Command');
 
 var CommandMap = require('./command/CommandMap');
 
+var port = 3000;
 
 var players = {};
 var commands = new CommandMap(this);
@@ -251,5 +252,5 @@ io.sockets.on('connection', function(socket) {
 // }, 1000 / 30);
 
 
-console.log('MAGE Server Activated... PORT: ' + process.env.PORT);
+console.log('MAGE Server Activated... PORT: ' + port);
 server.listen(3000);
